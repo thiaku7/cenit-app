@@ -1,0 +1,6 @@
+{
+  "name": "CÉNIT",
+  "description": "Plan Maestro Cénit de Disciplina, Productividad y Transformación profunda por Thiago Ríos y Matías Maldonado.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
