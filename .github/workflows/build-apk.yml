@@ -19,10 +19,9 @@ jobs:
 
       - name: Grant execute permission
         run: chmod +x app/gradlew
-        continue-on-error: true
 
       - name: Build APK
-        run: cd app && ./gradlew assembleDebug || gradlew.bat assembleDebug
+        run: cd app && ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
