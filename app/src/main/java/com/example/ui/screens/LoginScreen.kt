@@ -254,33 +254,8 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Helpful footer with credentials info
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, borderColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                    .background(if (readingMode) SepiaWhite.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.2f))
-                    .padding(16.dp)
-            ) {
-                Column {
-                    Text(
-                        text = "DEPURACIÓN Y TESTING:",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = primaryColor,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "• Puede usar el código local 'CENIT2026' para omitir Firestore y probar la app de inmediato.\n" +
-                               "• ID de este Dispositivo:\n${securityService.deviceId}",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                        color = textColor.copy(alpha = 0.7f),
-                        lineHeight = 16.sp
-                    )
-                }
-            }
 
-            Spacer(modifier = Modifier.height(40.dp))
+
         }
     }
 }
