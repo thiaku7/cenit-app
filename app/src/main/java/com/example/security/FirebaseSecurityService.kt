@@ -38,7 +38,6 @@ class FirebaseSecurityService(private val context: Context) {
                         val dispositivoId = document.getString("dispositivoId") ?: ""
 
                         when {
-                            // Código libre — primer uso, vincular dispositivo
                             !enUso && dispositivoId.isEmpty() -> {
                                 docRef.update(
                                     mapOf(
@@ -52,11 +51,9 @@ class FirebaseSecurityService(private val context: Context) {
                                     callback.onError("Error al registrar dispositivo. Intentá de nuevo.")
                                 }
                             }
-                            // Código de este dispositivo — permitir entrada
                             dispositivoId == deviceId -> {
                                 callback.onSuccess()
                             }
-                            // Código ya usado por otro dispositivo
                             else -> {
                                 callback.onError("Este código ya está en uso en otro dispositivo.")
                             }
@@ -67,12 +64,12 @@ class FirebaseSecurityService(private val context: Context) {
                 }
                 .addOnFailureListener { exception ->
                     Log.e("CENIT", "Error de Firestore: ${exception.message}")
-                    callback.onError("Error de conexión. Verificá tu internet e intentá de nuevo.")
+                    callback.onError("Error de conexión: ${exception.message}")
                 }
 
         } catch (e: Exception) {
             Log.e("CENIT", "Firebase no inicializado: ${e.message}")
-            callback.onError("Error interno. Contactá al administrador.")
+            callback.onError("Error: ${e.message}")
         }
     }
 }
