@@ -8,8 +8,10 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
+import com.google.firebase.firestore.ktx.tasks
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -396,24 +398,24 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
         val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
 
         viewModelScope.launch {
-            db.collection("users").document(userId)
-                .collection("materias").get()
-                .addOnSuccessListener { snapshot ->
-                    snapshot.documents.forEach { doc ->
-                        val status = doc.getString("status") ?: "PENDIENTE"
-                        val notes = doc.getString("apuntes") ?: ""
-                        val timeSpent = doc.getLong("timeSpentSeconds")?.toInt() ?: 0
+            try {
+                val snapshot = db.collection("users").document(userId)
+                    .collection("materias").get().await()
 
-                        viewModelScope.launch {
-                            val subject = allSubjects.value.find { it.id.toString() == doc.id }
-                            subject?.let {
-                                val timeSpent = doc.getLong("timeSpentSeconds") ?: 0L
-                                repository.updateSubject(updated)
-                            }
-                        }
+                snapshot.documents.forEach { doc ->
+                    val status = doc.getString("status") ?: "PENDIENTE"
+                    val notes = doc.getString("apuntes") ?: ""
+                    val timeSpent = doc.getLong("timeSpentSeconds") ?: 0L
+
+                    val subject = allSubjects.value.find { it.id.toString() == doc.id }
+                    subject?.let {
+                        val updated = it.copy(status = status, notes = notes, timeSpentSeconds = timeSpent)
+                        repository.updateSubject(updated)
                     }
                 }
-                .addOnFailureListener { e -> Log.e("CENIT", "Error loading subjects: ${e.message}") }
+            } catch (e: Exception) {
+                Log.e("CENIT", "Error loading subjects: ${e.message}")
+            }
         }
     }
 
