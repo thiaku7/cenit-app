@@ -50,8 +50,8 @@ fun LoginScreen(
     } else {
         Brush.verticalGradient(
             colors = listOf(
-                Color(0xFF140D02), // Very subtle gold halo top
-                Color(0xFF080808), // pure black
+                Color(0xFF140D02),
+                Color(0xFF080808),
                 Color(0xFF080808)
             )
         )
@@ -68,7 +68,6 @@ fun LoginScreen(
             .background(bgBrush)
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
-        // Grid pattern overlay (from HTML style)
         if (!readingMode) {
             Box(
                 modifier = Modifier
@@ -87,7 +86,6 @@ fun LoginScreen(
         ) {
             Spacer(modifier = Modifier.height(40.dp))
 
-            // Eyebrow
             Text(
                 text = "DOCUMENTO CLASIFICADO · ÉLITE",
                 style = MaterialTheme.typography.labelSmall,
@@ -99,7 +97,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Main Title
             Text(
                 text = "CÉNIT",
                 style = MaterialTheme.typography.displayLarge.copy(
@@ -121,7 +118,6 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // Verification Card
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -193,7 +189,6 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Error feedback
                     verificationError?.let { error ->
                         Text(
                             text = error,
@@ -215,6 +210,7 @@ fun LoginScreen(
                             securityService.verifyAccessCode(enteredCode, object : FirebaseSecurityService.SecurityCallback {
                                 override fun onSuccess() {
                                     isLoading = false
+                                    viewModel.setFirestoreUserId(securityService.deviceId)
                                     viewModel.verifyCodeDirectly(enteredCode)
                                 }
 
@@ -253,10 +249,6 @@ fun LoginScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
-
-
-
         }
     }
 }
-
