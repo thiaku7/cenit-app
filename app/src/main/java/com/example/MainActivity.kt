@@ -27,6 +27,13 @@ class MainActivity : ComponentActivity() {
             val showWelcomeScreen by viewModel.showWelcomeScreen.collectAsState()
             val readingMode by viewModel.readingMode.collectAsState()
 
+            LaunchedEffect(securityVerified) {
+                if (securityVerified) {
+                    viewModel.loadFirestoreUserId()
+                    viewModel.loadDataFromFirestore()
+                }
+            }
+
             MyApplicationTheme(readingMode = readingMode) {
                 Crossfade(
                     targetState = securityVerified,
