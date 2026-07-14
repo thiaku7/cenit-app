@@ -362,7 +362,7 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
         val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
 
         val data = mapOf(
-            "titulo" to subject.title,
+            "titulo" to subject.name,
             "fase" to subject.phase,
             "status" to subject.status,
             "progreso" to ((subject.timeSpentSeconds / 3600.0) * 100 / 40).toInt().coerceIn(0, 100),
