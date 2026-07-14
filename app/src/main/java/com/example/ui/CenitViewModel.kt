@@ -61,10 +61,10 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
     private val _pomoTimerActive = MutableStateFlow(false)
     val pomoTimerActive: StateFlow<Boolean> = _pomoTimerActive.asStateFlow()
 
-    private val _pomoTimeRemaining = MutableStateFlow(1500L) // 25 minutes default in seconds
+    private val _pomoTimeRemaining = MutableStateFlow(1500L)
     val pomoTimeRemaining: StateFlow<Long> = _pomoTimeRemaining.asStateFlow()
 
-    private val _pomoIsStudySession = MutableStateFlow(true) // true if study, false if rest
+    private val _pomoIsStudySession = MutableStateFlow(true)
     val pomoIsStudySession: StateFlow<Boolean> = _pomoIsStudySession.asStateFlow()
 
     private val _pomoConfigStudyMinutes = MutableStateFlow(25)
@@ -79,6 +79,10 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
     // Daily Quote
     private val _dailyQuote = MutableStateFlow("")
     val dailyQuote: StateFlow<String> = _dailyQuote.asStateFlow()
+
+    // Firestore
+    private val _firestoreUserId = MutableStateFlow<String?>(null)
+    val firestoreUserId: StateFlow<String?> = _firestoreUserId.asStateFlow()
 
     private var countdownTimer: CountDownTimer? = null
 
@@ -97,7 +101,6 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            // Intialize data
             repository.initializeSubjectsIfNeeded()
             loadSavedStates()
             calculateStreakThresholds()
@@ -125,7 +128,6 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun selectRandomQuote() {
-        // Deterministic daily index based on day of year
         val dayOfYear = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
         val index = dayOfYear % quotesList.size
         _dailyQuote.value = quotesList[index]
@@ -176,7 +178,6 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
         _selectedPhase.value = phase
     }
 
-    // Configuration modifiers
     fun toggleReadingMode() {
         val newValue = !_readingMode.value
         _readingMode.value = newValue
@@ -216,7 +217,6 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
         _selectedSubjectForPomo.value = subject
     }
 
-    // Timer Controls
     fun startTimer() {
         if (_pomoTimerActive.value) return
         _pomoTimerActive.value = true
@@ -252,25 +252,21 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
         val finishedSessionWasStudy = _pomoIsStudySession.value
 
         if (finishedSessionWasStudy) {
-            // Study Pomodoro finished! Add progress to DB and visual calendar
             val studyMinutes = _pomoConfigStudyMinutes.value
             addStudiedMinutesToCalendar(studyMinutes)
 
-            // Accumulate study time inside selecting subject if active
             _selectedSubjectForPomo.value?.let { subject ->
                 viewModelScope.launch {
                     val updated = subject.copy(timeSpentSeconds = subject.timeSpentSeconds + (studyMinutes * 60))
                     repository.updateSubject(updated)
-                    // Refresh subject reference
+                    syncSubjectToFirestore(updated)
                     _selectedSubjectForPomo.value = updated
                 }
             }
 
-            // Trigger streak update
             incrementStreakProgress()
         }
 
-        // Toggle state and reset
         _pomoIsStudySession.value = !finishedSessionWasStudy
         resetTimerToConfig()
     }
@@ -288,11 +284,11 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
         val currentStreak = prefs.getInt("current_streak", 0)
 
         val newStreak = if (lastStudyDate == todayStr) {
-            currentStreak // Already studied today, streak stays same
+            currentStreak
         } else if (lastStudyDate == getYesterdayDateString()) {
-            currentStreak + 1 // Studied yesterday, increment streak!
+            currentStreak + 1
         } else {
-            1 // First streak day, or reset
+            1
         }
 
         prefs.edit().apply {
@@ -301,6 +297,7 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
             apply()
         }
         _studyStreak.value = newStreak
+        syncStreakToFirestore()
     }
 
     private fun calculateStreakThresholds() {
@@ -309,7 +306,6 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
         val currentStreak = prefs.getInt("current_streak", 0)
 
         if (lastStudyDate.isNotEmpty() && lastStudyDate != todayStr && lastStudyDate != getYesterdayDateString()) {
-            // Long time no study, streak broken!
             prefs.edit().putInt("current_streak", 0).apply()
             _studyStreak.value = 0
         }
@@ -319,6 +315,7 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val updated = subject.copy(status = newStatus)
             repository.updateSubject(updated)
+            syncSubjectToFirestore(updated)
             if (_selectedSubjectForPomo.value?.id == subject.id) {
                 _selectedSubjectForPomo.value = updated
             }
@@ -329,6 +326,7 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val updated = subject.copy(notes = newNotes)
             repository.updateSubject(updated)
+            syncSubjectToFirestore(updated)
             if (_selectedSubjectForPomo.value?.id == subject.id) {
                 _selectedSubjectForPomo.value = updated
             }
@@ -349,7 +347,76 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Helper Date utilities
+    fun setFirestoreUserId(userId: String) {
+        _firestoreUserId.value = userId
+        prefs.edit().putString("firestore_user_id", userId).apply()
+    }
+
+    fun loadFirestoreUserId() {
+        val userId = prefs.getString("firestore_user_id", null)
+        _firestoreUserId.value = userId
+    }
+
+    fun syncSubjectToFirestore(subject: SubjectProgress) {
+        val userId = _firestoreUserId.value ?: return
+        val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+
+        val data = mapOf(
+            "titulo" to subject.title,
+            "fase" to subject.phase,
+            "status" to subject.status,
+            "progreso" to ((subject.timeSpentSeconds / 3600.0) * 100 / 40).toInt().coerceIn(0, 100),
+            "apuntes" to subject.notes,
+            "timeSpentSeconds" to subject.timeSpentSeconds
+        )
+
+        db.collection("users").document(userId)
+            .collection("materias").document(subject.id.toString())
+            .set(data, com.google.firebase.firestore.SetOptions.merge())
+            .addOnFailureListener { e -> Log.e("CENIT", "Error sync subject: ${e.message}") }
+    }
+
+    fun syncStreakToFirestore() {
+        val userId = _firestoreUserId.value ?: return
+        val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+
+        val data = mapOf(
+            "strikeCount" to _studyStreak.value,
+            "lastStudyDate" to getTodayDateString(),
+            "totalDaysStudied" to _studyStreak.value
+        )
+
+        db.collection("users").document(userId)
+            .set(data, com.google.firebase.firestore.SetOptions.merge())
+            .addOnFailureListener { e -> Log.e("CENIT", "Error sync streak: ${e.message}") }
+    }
+
+    fun loadDataFromFirestore() {
+        val userId = _firestoreUserId.value ?: return
+        val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+
+        viewModelScope.launch {
+            db.collection("users").document(userId)
+                .collection("materias").get()
+                .addOnSuccessListener { snapshot ->
+                    snapshot.documents.forEach { doc ->
+                        val status = doc.getString("status") ?: "PENDIENTE"
+                        val notes = doc.getString("apuntes") ?: ""
+                        val timeSpent = doc.getLong("timeSpentSeconds")?.toInt() ?: 0
+
+                        viewModelScope.launch {
+                            val subject = allSubjects.value.find { it.id.toString() == doc.id }
+                            subject?.let {
+                                val updated = it.copy(status = status, notes = notes, timeSpentSeconds = timeSpent)
+                                repository.updateSubject(updated)
+                            }
+                        }
+                    }
+                }
+                .addOnFailureListener { e -> Log.e("CENIT", "Error loading subjects: ${e.message}") }
+        }
+    }
+
     fun getTodayDateString(): String {
         return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
     }
