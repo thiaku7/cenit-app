@@ -407,7 +407,7 @@ class CenitViewModel(application: Application) : AndroidViewModel(application) {
                         viewModelScope.launch {
                             val subject = allSubjects.value.find { it.id.toString() == doc.id }
                             subject?.let {
-                                val updated = it.copy(status = status, notes = notes, timeSpentSeconds = timeSpent)
+                                val timeSpent = doc.getLong("timeSpentSeconds") ?: 0L
                                 repository.updateSubject(updated)
                             }
                         }
